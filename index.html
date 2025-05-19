@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trip Cost Calculator & Visualizer (Line Graph)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 900px;
+            margin: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #1a73e8; /* Google Blue */
+            margin-bottom: 25px;
+        }
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #5f6368;
+        }
+        .input-group input[type="number"] {
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .input-group input[type="number"]:focus {
+            border-color: #1a73e8;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .days-input-group {
+            flex-grow: 1;
+            min-width: 150px;
+        }
+        button#plotButton {
+            background-color: #1a73e8;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+        button#plotButton:hover {
+            background-color: #1765c9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            margin-top: 30px;
+            padding: 10px; /* Reduced padding as SVG has its own margins */
+            border: 1px solid #e0e0e0;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            /* No overflow-x: auto; SVG will scale */
+        }
+        .chart-title {
+            text-align: center;
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #3c4043;
+        }
+        #tripCostChart {
+            width: 100%;
+            height: 400px; /* Adjust as needed */
+            display: block; /* Prevents extra space below SVG */
+        }
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #888;
+            stroke-width: 1;
+            shape-rendering: crispEdges;
+        }
+        .axis text {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.75em;
+            fill: #555;
+        }
+        .grid-line {
+            stroke: #e0e0e0;
+            stroke-dasharray: 2,2;
+            stroke-width: 1;
+        }
+        .fixed-cost-area {
+            fill: #ffcc80; /* Light orange */
+            opacity: 0.6;
+        }
+        .total-cost-line {
+            fill: none;
+            stroke: #1a73e8; /* Google Blue */
+            stroke-width: 2.5px;
+        }
+        .data-point {
+            fill: #1a73e8;
+            stroke: white;
+            stroke-width: 1.5px;
+        }
+        .chart-tooltip {
+            position: absolute; /* Positioned by JavaScript */
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            pointer-events: none; /* So it doesn't interfere with mouse events on SVG elements */
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: translate(-50%, -110%); /* Position above point, centered */
+            white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #error-message {
+            color: #d93025; /* Google Red */
+            margin-top: 15px;
+            font-weight: 500;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trip Cost Visualizer</h1>
+
+        <div class="input-grid">
+            <div class="input-group">
+                <label for="hotelPrice">Hotel Price per Night ($):</label>
+                <input type="number" id="hotelPrice" value="100" min="0" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="transportCost">Transportation per Day ($):</label>
+                <input type="number" id="transportCost" value="20" min="0" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="foodCost">Food Cost per Day ($):</label>
+                <input type="number" id="foodCost" value="50" min="0" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="extraCosts">Extra Costs per Day ($):</label>
+                <input type="number" id="extraCosts" value="10" min="0" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="flightCost">Total Flight Cost ($):</label>
+                <input type="number" id="flightCost" value="500" min="0" step="0.01">
+            </div>
+            <div class="input-group">
+                <label for="additionalFlightCost">Additional Fixed Costs ($):</label>
+                <input type="number" id="additionalFlightCost" value="50" min="0" step="0.01">
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="input-group days-input-group">
+                <label for="numDays">Number of Days to Plot:</label>
+                <input type="number" id="numDays" value="7" min="1" step="1">
+            </div>
+            <button id="plotButton" onclick="handlePlotButtonClick()">Plot Costs</button>
+        </div>
+        
+        <div id="error-message"></div>
+
+        <div class="chart-container" id="chartContainer" style="display: none;">
+            <div class="chart-title" id="chartTitle">Trip Cost Over Time</div>
+            <svg id="tripCostChart"></svg>
+            <div id="chartTooltip" class="chart-tooltip"></div>
+        </div>
+    </div>
+
+    <script>
+        let liveUpdatesEnabled = false;
+        const chartTooltip = document.getElementById('chartTooltip');
+
+        function setupLiveUpdates() {
+            const inputs = document.querySelectorAll('.container input[type="number"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', () => {
+                    if (liveUpdatesEnabled) {
+                        clearTimeout(input.debounceTimer);
+                        input.debounceTimer = setTimeout(() => {
+                            calculateAndPlot(false);
+                        }, 300);
+                    }
+                });
+            });
+        }
+
+        function handlePlotButtonClick() {
+            liveUpdatesEnabled = true;
+            document.getElementById('chartContainer').style.display = 'block';
+            calculateAndPlot(true);
+        }
+        
+        function calculateAndPlot(isTriggeredByButton) {
+            const hotelPrice = parseFloat(document.getElementById('hotelPrice').value) || 0;
+            const transportCost = parseFloat(document.getElementById('transportCost').value) || 0;
+            const foodCost = parseFloat(document.getElementById('foodCost').value) || 0;
+            const extraCosts = parseFloat(document.getElementById('extraCosts').value) || 0;
+            const flightCost = parseFloat(document.getElementById('flightCost').value) || 0;
+            const additionalFlightCost = parseFloat(document.getElementById('additionalFlightCost').value) || 0;
+            const numDaysToPlot = parseInt(document.getElementById('numDays').value);
+
+            const errorMessageDiv = document.getElementById('error-message');
+            errorMessageDiv.textContent = '';
+
+            if (isNaN(numDaysToPlot) || numDaysToPlot < 1) {
+                errorMessageDiv.textContent = "Please enter a valid number of days (at least 1).";
+                if (isTriggeredByButton) document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+             if (numDaysToPlot > 366 && isTriggeredByButton) { // Limit for performance, can be adjusted
+                 if (!confirm(`Plotting ${numDaysToPlot} days might be very dense and slow. Continue?`)) {
+                    return;
+                 }
+            }
+
+
+            const dailyRecurringCost = hotelPrice + transportCost + foodCost + extraCosts;
+            const totalFixedCosts = flightCost + additionalFlightCost;
+
+            const costsPerDay = [];
+            for (let day = 1; day <= numDaysToPlot; day++) {
+                const totalCostForDay = (dailyRecurringCost * day) + totalFixedCosts;
+                costsPerDay.push({ day: day, cost: totalCostForDay });
+            }
+            
+            renderChart(costsPerDay, totalFixedCosts, numDaysToPlot);
+        }
+
+        function renderChart(data, totalFixedCosts, numDaysToPlot) {
+            const svg = document.getElementById('tripCostChart');
+            svg.innerHTML = ''; // Clear previous chart
+
+            const svgWidth = svg.clientWidth;
+            const svgHeight = svg.clientHeight;
+
+            const margin = { top: 20, right: 30, bottom: 50, left: 70 }; // Adjusted margins
+            const plotWidth = svgWidth - margin.left - margin.right;
+            const plotHeight = svgHeight - margin.top - margin.bottom;
+
+            if (plotWidth <= 0 || plotHeight <= 0) { // Not enough space to draw
+                document.getElementById('error-message').textContent = "Chart area too small to render.";
+                return;
+            }
+
+            // --- SCALES ---
+            // X Scale (Days)
+            const xScale = (day) => {
+                if (numDaysToPlot === 1) return plotWidth / 2; // Center if only one day
+                return ((day - 1) / (numDaysToPlot - 1)) * plotWidth;
+            };
+
+            // Y Scale (Cost)
+            const maxCost = data.length > 0 ? Math.max(...data.map(d => d.cost), totalFixedCosts) : totalFixedCosts;
+            const yDomainMax = maxCost === 0 ? 100 : Math.ceil(maxCost / 100) * 100; // Round up to nearest 100, min 100
+
+            const yScale = (cost) => plotHeight - (cost / yDomainMax) * plotHeight;
+
+            // --- AXES ---
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('transform', `translate(${margin.left}, ${margin.top})`);
+            svg.appendChild(g);
+
+            // Y-Axis
+            const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            yAxis.setAttribute('class', 'axis y-axis');
+            const numYticks = 5;
+            for (let i = 0; i <= numYticks; i++) {
+                const tickValue = (yDomainMax / numYticks) * i;
+                const yPos = yScale(tickValue);
+
+                // Grid line
+                const gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                gridLine.setAttribute('class', 'grid-line');
+                gridLine.setAttribute('x1', 0);
+                gridLine.setAttribute('x2', plotWidth);
+                gridLine.setAttribute('y1', yPos);
+                gridLine.setAttribute('y2', yPos);
+                yAxis.appendChild(gridLine);
+
+                const tickMark = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                tickMark.setAttribute('x1', -6);
+                tickMark.setAttribute('x2', 0);
+                tickMark.setAttribute('y1', yPos);
+                tickMark.setAttribute('y2', yPos);
+                yAxis.appendChild(tickMark);
+
+                const tickLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                tickLabel.setAttribute('x', -10);
+                tickLabel.setAttribute('y', yPos);
+                tickLabel.setAttribute('dy', '0.32em');
+                tickLabel.setAttribute('text-anchor', 'end');
+                tickLabel.textContent = `$${tickValue.toFixed(0)}`;
+                yAxis.appendChild(tickLabel);
+            }
+            g.appendChild(yAxis);
+            
+            // X-Axis
+            const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            xAxis.setAttribute('class', 'axis x-axis');
+            xAxis.setAttribute('transform', `translate(0, ${plotHeight})`);
+            
+            const maxXTicks = Math.min(numDaysToPlot, Math.floor(plotWidth / 50)); // Max 1 tick every 50px
+            const xTickValues = [];
+            if (numDaysToPlot === 1) {
+                xTickValues.push(1);
+            } else {
+                 // Show at least first and last day. Add intermediate ticks if space allows.
+                xTickValues.push(1);
+                if (numDaysToPlot > 1) xTickValues.push(numDaysToPlot);
+
+                if (numDaysToPlot > 2 && maxXTicks > 2) {
+                    const idealTickInterval = Math.ceil((numDaysToPlot - 2) / (maxXTicks - 2));
+                    for (let day = 1 + idealTickInterval; day < numDaysToPlot; day += idealTickInterval) {
+                        if (xTickValues.length < maxXTicks) {
+                             xTickValues.push(day);
+                        } else break;
+                    }
+                }
+                xTickValues.sort((a,b) => a - b); // Ensure sorted
+            }
+
+
+            xTickValues.forEach(day => {
+                const xPos = xScale(day);
+                const tickMark = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                tickMark.setAttribute('x1', xPos);
+                tickMark.setAttribute('x2', xPos);
+                tickMark.setAttribute('y1', 0);
+                tickMark.setAttribute('y2', 6);
+                xAxis.appendChild(tickMark);
+
+                const tickLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                tickLabel.setAttribute('x', xPos);
+                tickLabel.setAttribute('y', 9);
+                tickLabel.setAttribute('dy', '0.71em');
+                tickLabel.setAttribute('text-anchor', 'middle');
+                tickLabel.textContent = `Day ${day}`;
+                xAxis.appendChild(tickLabel);
+            });
+            g.appendChild(xAxis);
+
+             // X-Axis Label
+            const xAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            xAxisLabel.setAttribute('text-anchor', 'middle');
+            xAxisLabel.setAttribute('x', plotWidth / 2);
+            xAxisLabel.setAttribute('y', plotHeight + margin.bottom - 10);
+            xAxisLabel.textContent = 'Number of Days';
+            xAxisLabel.style.fontSize = '0.9em';
+            xAxisLabel.style.fill = '#333';
+            g.appendChild(xAxisLabel);
+
+            // Y-Axis Label
+            const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            yAxisLabel.setAttribute('text-anchor', 'middle');
+            yAxisLabel.setAttribute('transform', `translate(${-margin.left + 20}, ${plotHeight / 2}) rotate(-90)`);
+            yAxisLabel.textContent = 'Total Cost ($)';
+            yAxisLabel.style.fontSize = '0.9em';
+            yAxisLabel.style.fill = '#333';
+            g.appendChild(yAxisLabel);
+
+            // --- FIXED COST AREA ---
+            if (totalFixedCosts > 0) {
+                const fixedCostRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                fixedCostRect.setAttribute('class', 'fixed-cost-area');
+                fixedCostRect.setAttribute('x', 0);
+                fixedCostRect.setAttribute('y', yScale(totalFixedCosts));
+                fixedCostRect.setAttribute('width', plotWidth);
+                fixedCostRect.setAttribute('height', plotHeight - yScale(totalFixedCosts)); // Height from fixed cost line to x-axis
+                g.appendChild(fixedCostRect);
+            }
+
+            // --- TOTAL COST LINE ---
+            if (data.length > 0) {
+                const linePath = data.map(d => `${xScale(d.day)},${yScale(d.cost)}`).join(' ');
+                const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                polyline.setAttribute('class', 'total-cost-line');
+                // For a single point, polyline doesn't render. Points are handled below.
+                if (data.length > 1) {
+                    polyline.setAttribute('points', linePath);
+                }
+                g.appendChild(polyline);
+
+                // --- DATA POINTS & TOOLTIPS ---
+                // Draw points if not too many, to avoid clutter
+                const showPointsThreshold = 60; // Max days to show individual points
+                if (numDaysToPlot <= showPointsThreshold || numDaysToPlot === 1) {
+                    data.forEach(d => {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('class', 'data-point');
+                        circle.setAttribute('cx', xScale(d.day));
+                        circle.setAttribute('cy', yScale(d.cost));
+                        circle.setAttribute('r', numDaysToPlot > 30 ? 3 : 4); // Smaller radius for more points
+
+                        circle.addEventListener('mouseover', (event) => {
+                            chartTooltip.textContent = `Day ${d.day}: $${d.cost.toFixed(2)}`;
+                            chartTooltip.style.opacity = '1';
+                            // Position tooltip: Get SVG's position on page + circle's position in SVG
+                            const svgRect = svg.getBoundingClientRect();
+                            const cxPage = svgRect.left + margin.left + parseFloat(circle.getAttribute('cx')) + window.scrollX;
+                            const cyPage = svgRect.top + margin.top + parseFloat(circle.getAttribute('cy')) + window.scrollY;
+                            
+                            chartTooltip.style.left = `${cxPage}px`;
+                            chartTooltip.style.top = `${cyPage}px`;
+                        });
+                        circle.addEventListener('mouseout', () => {
+                            chartTooltip.style.opacity = '0';
+                        });
+                        g.appendChild(circle);
+                    });
+                }
+            }
+        }
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            setupLiveUpdates();
+            // Optionally, plot with default values on load if you remove the "Plot Costs" button first requirement
+            // calculateAndPlot(true); 
+            // document.getElementById('chartContainer').style.display = 'block';
+            // liveUpdatesEnabled = true;
+        });
+
+    </script>
+</body>
+</html>
